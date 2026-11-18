@@ -1,0 +1,5 @@
+# Rust build output and generated test files
+/target/
+
+# Personal title edits and Steam metadata backups
+/settings/
