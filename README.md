@@ -4,6 +4,11 @@
 
 A local title editor for Steam games. Full game titles can be edited, but the main purpose is to add release years to titles, making major entries in a game series easier to tell apart.
 
+
+
+![Steam Library after title changes (e.g. release years added)](assets/steam_library_after_yatse.png)
+
+
  __   __   _ _____ ___ ___
  \ \ / /  /_\_   _/ __| __|
   \ V /  / _ \| | \__ \ _|
