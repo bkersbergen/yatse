@@ -261,14 +261,38 @@ pub fn discover_progress(root: &Path, account: &str, dir: &Path, progress: impl 
             }
         }
     }
-    let online: BTreeMap<u32, String> = fs::read(dir.join(format!("owned-{account}.json")))
+    let snapshot: Option<BTreeMap<u32, String>> = fs::read(dir.join(format!("owned-{account}.json")))
         .ok()
-        .and_then(|b| serde_json::from_slice(&b).ok())
-        .unwrap_or_default();
-    owned.extend(online.keys().copied());
-    let ids: BTreeSet<u32> = owned.union(&installed).copied().collect();
+        .and_then(|b| serde_json::from_slice(&b).ok());
+    let mut verified = snapshot.is_some();
+    let mut online = snapshot.unwrap_or_default();
+    if verified { owned = online.keys().copied().collect(); }
     progress(60, "Reading Steam title database");
     let db = Database::read(&root.join("appcache/appinfo.vdf"))?;
+    let mut ownership_warning = String::new();
+    if root.join("steamclient64.dll").is_file() && crate::steam_guard::check().unwrap_or(false) {
+        progress(70, "Checking ownership with signed-in Steam");
+        let candidates: BTreeSet<u32> = db.entries.iter().map(|e| e.id)
+            .chain(owned.iter().copied()).chain(installed.iter().copied()).collect();
+        match crate::steam_ownership::query(root, &account, &candidates.into_iter().collect::<Vec<_>>()) {
+            Ok(current) => {
+                online = current.iter().map(|id| {
+                    let name = db.entries.iter().find(|e| e.id == *id)
+                        .map(|e| e.root.text(&["appinfo", "common", "name"]))
+                        .unwrap_or_else(|| online.get(id).cloned().unwrap_or_default());
+                    (*id, name)
+                }).collect();
+                fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+                write_json(&dir.join(format!("owned-{account}.json")), &online)?;
+                owned = current;
+                verified = true;
+            }
+            Err(e) => ownership_warning = format!(" Ownership refresh failed: {e}."),
+        }
+    }
+    // Shared metadata supplies titles, never ownership. Verified account
+    // records supersede stale caches and installed leftovers.
+    let ids: BTreeSet<u32> = if verified { owned.clone() } else { owned.union(&installed).copied().collect() };
     progress(85, "Preparing titles and saved edits");
     let saved = state(dir);
     let mut rows = vec![];
@@ -280,7 +304,8 @@ pub fn discover_progress(root: &Path, account: &str, dir: &Path, progress: impl 
         let typ = entry
             .map(|e| e.root.text(&["appinfo", "common", "type"]))
             .unwrap_or_default();
-        if !typ.is_empty() && !typ.eq_ignore_ascii_case("game") {
+        if (entry.is_some() && !typ.eq_ignore_ascii_case("game"))
+            || (entry.is_none() && online.get(&id).is_none_or(|name| name.is_empty())) {
             continue;
         }
         let old = if name.is_empty() {
@@ -357,7 +382,12 @@ pub fn discover_progress(root: &Path, account: &str, dir: &Path, progress: impl 
     }
     rows.sort_by_key(|r| r.old.to_lowercase());
     progress(100, "Library ready");
-    Ok(Library{path:root.into(),account,rows,fingerprint:hash(&db.raw),coverage:format!("{} cached owned AppIDs + {} installed AppIDs. Uncached purchases may be absent; sign in and let Steam refresh your library.",owned.len(),installed.len())})
+    let coverage = if verified {
+        format!("{} games from verified account ownership. Open Steam before launching Yatse to refresh.{}", rows.len(), ownership_warning)
+    } else {
+        format!("{} games from incomplete local records. Open Steam, sign in, then restart Yatse to include missing purchases.{}", rows.len(), ownership_warning)
+    };
+    Ok(Library{path:root.into(),account,rows,fingerprint:hash(&db.raw),coverage})
 }
 pub fn classify(s: &str) -> String {
     let s = s.to_lowercase();

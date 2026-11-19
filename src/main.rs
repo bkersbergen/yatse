@@ -2,6 +2,7 @@
 
 mod disk_worker;
 mod steam_guard;
+mod steam_ownership;
 mod library;
 mod metadata;
 
@@ -268,7 +269,7 @@ fn main() {
         match discover(&root, &account, &data) {
             Ok(l) => {
                 println!("{}\n{} games", l.coverage, l.rows.len());
-                for r in l.rows.iter().take(12) {
+                for r in &l.rows {
                     println!(
                         "{} | {} | {:?} | {} | {}",
                         r.id,
@@ -394,7 +395,6 @@ async fn ui_main() {
         background_window();
     }
     let mut steam_monitor = steam_guard::Monitor::new();
-    wait_for_steam(&mut steam_monitor).await;
     let mut lib = load_library(root.clone(), account.clone(), data.clone()).await.unwrap_or_else(|e| Library {
         path: root.clone(),
         account: account.clone(),
@@ -402,7 +402,15 @@ async fn ui_main() {
         fingerprint: String::new(),
         coverage: e,
     });
-    let mut status = "Preview only. Your Steam metadata has not been changed.".to_string();
+    // Capture signed-in ownership before asking Steam to close for safe editing.
+    let steam_was_running = steam_guard::check().unwrap_or(true);
+    wait_for_steam(&mut steam_monitor).await;
+    if steam_was_running {
+        if let Ok(refreshed) = load_library(root.clone(), account.clone(), data.clone()).await {
+            lib = refreshed;
+        }
+    }
+    let mut status = String::new();
     let mut search = String::new();
     let mut tab = 0;
     let mut offset = 0usize;
@@ -576,7 +584,7 @@ async fn ui_main() {
         panel(16., h - 155., 192., 127., Color::from_hex(0xe2ebe5));
         txt("Safe by design", 29., h - 128., 18., TEAL);
         wrap(
-            "Preview first. Close Steam to apply. Every write gets a verified backup.",
+            "Preview first. Every write gets a verified backup.",
             29.,
             h - 101.,
             162.,
@@ -702,7 +710,7 @@ async fn ui_main() {
                 16.,
                 MUTED,
             );
-            wrap("Ownership comes from this account's local library cache, plus installed manifests across all library folders. Uncached or never-played purchases may be absent. Open Steam online and refresh your library before scanning. Multiple accounts are kept separate.",x+24.,451.,content-120.,18.,MUTED);
+            wrap("Open Steam and sign in before launching Yatse to refresh ownership automatically. Close Steam when prompted to edit safely. Verified ownership is saved for offline use; Web API verification below is optional.",x+24.,451.,content-120.,18.,MUTED);
             if button(
                 "Load this library",
                 Rect::new(x + 24., 540., 190., 43.),
@@ -903,7 +911,7 @@ async fn ui_main() {
                         if r.installed {
                             "Installed"
                         } else {
-                            "Owned cache"
+                            "Owned library"
                         }
                     ),
                     a,
@@ -1131,7 +1139,7 @@ async fn ui_main() {
             INK,
         );
         txt(
-            "Close Steam before applying • backup created automatically",
+            "Backup created automatically",
             x,
             h - 62.,
             14.,

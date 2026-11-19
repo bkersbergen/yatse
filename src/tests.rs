@@ -1,6 +1,47 @@
 use crate::{append_year, library::*, metadata::*, suffix_year};
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, fs, path::Path};
+#[test]
+fn discovery_excludes_unowned_metadata_and_preserves_owned_edits() {
+    let root = std::env::temp_dir().join(format!(
+        "yatse-discovery-regression-{}", std::process::id()
+    ));
+    fs::create_dir_all(root.join("appcache")).unwrap();
+    fs::create_dir_all(root.join("userdata/123/config/librarycache")).unwrap();
+    fs::write(root.join("appcache/appinfo.vdf"), fixture_bytes()).unwrap();
+    let settings = root.join("settings");
+    fs::create_dir_all(&settings).unwrap();
+    // AppID 10 exists in appinfo but is not owned. AppID 20 is a verified
+    // purchase missing from the partial friends cache.
+    fs::write(settings.join("owned-123.json"), br#"{"20":"Same name"}"#).unwrap();
+    // Stale ownership and installed leftovers must not override verification.
+    fs::write(root.join("userdata/123/config/librarycache/10.json"), br#"[["friends",{"data":{"your_info":{"owned":true}}}]]"#).unwrap();
+    fs::create_dir_all(root.join("steamapps")).unwrap();
+    fs::write(root.join("steamapps/appmanifest_10.acf"), "").unwrap();
+    let lib = discover(&root, "123", &settings).unwrap();
+    assert_eq!(
+        lib.rows.iter().map(|r| r.id).collect::<Vec<_>>(),
+        vec![20]
+    );
+    let mut rows = lib.rows;
+    let row = rows.iter_mut().find(|r| r.id == 20).unwrap();
+    row.proposed = append_year(&row.old, 2009);
+    row.year = Some(2009);
+    row.approved = true;
+    row.selected = true;
+    assert!(row.ready());
+    save(&settings, &rows).unwrap();
+    let reloaded = discover(&root, "123", &settings).unwrap();
+    let row = reloaded.rows.iter().find(|r| r.id == 20).unwrap();
+    assert_eq!(row.old, "Same name");
+    assert_eq!(row.proposed, "Same name (2009)");
+    assert!(row.ready());
+    fs::write(settings.join("owned-123.json"), b"{}").unwrap();
+    assert!(discover(&root, "123", &settings).unwrap().rows.is_empty());
+    fs::remove_file(settings.join("owned-123.json")).unwrap();
+    assert_eq!(discover(&root, "123", &settings).unwrap().rows[0].id, 10);
+    fs::remove_dir_all(root).unwrap();
+}
 pub fn run(root: &Path, dir: &Path) -> Value {
     let mut steps = vec![];
     let mut check = |step: &str, passed: bool, detail: String| {

@@ -31,6 +31,11 @@ Once the titles are updated, your Steam library becomes easier to browse. Releas
 
 ![Steam library after using YATSE](assets/steam_library_after_yatse.png)
 
+
+Yatse comes with Steam running detection and with Steam metadata change detection.
+
+![Steam running detected](assets/yatse_steam_running.png)
+
 ## Download & usage
 
 Download the Windows x64 executable from [GitHub Releases](https://github.com/bkersbergen/yatse/releases).
