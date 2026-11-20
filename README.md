@@ -2,7 +2,7 @@
 
 **Make your Steam library easier to navigate.**
 
-Do you also struggle to figure out which COD- *Modern Warfare 3* and *Modern Warfare III* game is which? With so many sequels, reboots, and similarly named games, finding the right game in your Steam library can be confusing.
+Do you also struggle to figure out which COD- *Modern Warfare 3* and *Modern Warfare III* game is which? With so many sequels, reboots, and even similarly named games, finding the right game in your Steam library can be confusing.
 
 That's why I created **YATSE**.
 
