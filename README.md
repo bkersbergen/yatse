@@ -2,13 +2,15 @@
 
 **Make your Steam library easier to navigate.**
 
-Ever struggled to figure out which COD *Modern Warfare 3* and *Modern Warfare III* game is which? With so many sequels, reboots, and similarly named games, finding the right game in your Steam library can be confusing.
+Do you also struggle to figure out which COD- *Modern Warfare 3* and *Modern Warfare III* game is which? With so many sequels, reboots, and similarly named games, finding the right game in your Steam library can be confusing.
 
 That's why I created **YATSE**.
 
 YATSE is a small Windows utility that lets you **change the displayed titles of games in your local Steam library**.
 
 It was originally designed to automatically add release years to game titles, but you can customize the entire title however you like.
+
+YATSE modifies local Steam metadata. It does not rename games on your Steam account or change their official titles.
 
 ## What can YATSE do?
 
